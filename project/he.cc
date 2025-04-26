@@ -15,6 +15,19 @@
         NS3 nodes and applications can reuse encryption without rebuilding state,
         allowing encrypted data to be passed reliably in simulations.
 
+    Internal Design Overview:
+                  (at startup)
+                        ↓
+          ┌──────────────────────────────┐
+          │    static SEALSingleton       │
+          │  (holds keys, context, tools) │
+          └──────────────────────────────┘
+                        ↓
+      encrypt_string() uses singleton.encryptor
+      decrypt_string() uses singleton.decryptor
+                        ↓
+  packets, nodes, apps can call it freely during simulation
+
     Dependencies:
     - Microsoft SEAL library (https://github.com/microsoft/SEAL)
 
