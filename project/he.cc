@@ -11,7 +11,7 @@
 
     Why this matters:
         Homomorphic encryption lets you process private data while keeping it private.
-        By making the SEAL keys and context static, this design ensures 
+        By making the SEAL keys and context static, this design ensures
         NS3 nodes and applications can reuse encryption without rebuilding state,
         allowing encrypted data to be passed reliably in simulations.
 
@@ -134,6 +134,7 @@ std::string decrypt_string(const seal::Ciphertext &cipher) {
 } // namespace example
 
 int main() {
+
     using namespace example;
 
     const std::string_view cam_message =
