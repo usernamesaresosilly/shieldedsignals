@@ -9,7 +9,6 @@
 
     Dependencies:
     - Microsoft SEAL library (https://github.com/microsoft/SEAL)
-*/
 
 #pragma once
 
@@ -26,3 +25,11 @@ namespace example {
     std::string decrypt_string(const seal::Ciphertext &cipher);
 
 } // namespace example
+
+
+
+
+Removing until we get the executable working properly.
+*/
+
+
