@@ -1,0 +1,18 @@
+cmake_minimum_required(VERSION 3.15)
+project(he)
+
+set(CMAKE_CXX_STANDARD 20)
+
+# Global includes/libraries
+include_directories(${CMAKE_SOURCE_DIR})
+include_directories(/usr/local/include)       # SEAL, GSL, etc.
+link_directories(/usr/local/lib)
+
+# Source files (library logic)
+set(SOURCES
+    he.cc
+)
+
+# Test binary
+add_executable(testhe test/testhe.cc ${SOURCES})
+target_link_libraries(testhe seal-4.1 cryptopp)
