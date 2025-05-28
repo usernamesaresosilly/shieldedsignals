@@ -913,4 +913,50 @@ V2xKpi::SavePsschTbCorruptionStats(uint32_t totalTbRx,
         "Could not correctly finalize the statement. Db error: " << sqlite3_errmsg(m_db));
 }
 
+void
+V2xKpi::SaveCryptoOverhead(uint32_t nodeId, double encryptTime, double decryptTime, std::size_t length, std::size_t declength)
+{
+    int rc;
+    rc = sqlite3_open(m_dbPath.c_str(), &m_db);
+    NS_ABORT_MSG_UNLESS(rc == SQLITE_OK, "Error open DB. Db error: " << sqlite3_errmsg(m_db));
+
+    std::string tableName = "cryptoOverhead";
+    std::string cmd = ("CREATE TABLE IF NOT EXISTS " + tableName +
+                       " ("
+                       "nodeId INTEGER NOT NULL,"
+                       "encryptionTime REAL NOT NULL,"
+                       "decryptionTime REAL NOT NULL,"
+                       "length INTEGER NOT NULL,"
+                       "declength INTEGER NOT NULL,"
+                       "SEED INTEGER NOT NULL,"
+                       "RUN INTEGER NOT NULL"
+                       ");");
+    rc = sqlite3_exec(m_db, cmd.c_str(), nullptr, nullptr, nullptr);
+    NS_ABORT_MSG_UNLESS(rc == SQLITE_OK,
+                        "Error creating table. Db error: " << sqlite3_errmsg(m_db));
+
+    cmd = "INSERT INTO " + tableName + " VALUES (?, ?, ?, ?, ?, ?, ?);";
+    sqlite3_stmt* stmt;
+    rc = sqlite3_prepare_v2(m_db, cmd.c_str(), static_cast<int>(cmd.size()), &stmt, nullptr);
+    NS_ABORT_MSG_UNLESS(rc == SQLITE_OK, "Error INSERT. Db error: " << sqlite3_errmsg(m_db));
+
+    NS_ABORT_UNLESS(sqlite3_bind_int(stmt, 1, nodeId) == SQLITE_OK);
+    NS_ABORT_UNLESS(sqlite3_bind_double(stmt, 2, encryptTime) == SQLITE_OK);
+    NS_ABORT_UNLESS(sqlite3_bind_double(stmt, 3, decryptTime) == SQLITE_OK);
+    NS_ABORT_UNLESS(sqlite3_bind_int(stmt, 4, length) == SQLITE_OK);
+    NS_ABORT_UNLESS(sqlite3_bind_int(stmt, 5, declength) == SQLITE_OK);
+    NS_ABORT_UNLESS(sqlite3_bind_int(stmt, 6, RngSeedManager::GetSeed()) == SQLITE_OK);
+    NS_ABORT_UNLESS(sqlite3_bind_int(stmt, 7, RngSeedManager::GetRun()) == SQLITE_OK);
+    
+
+    rc = sqlite3_step(stmt);
+    NS_ABORT_MSG_UNLESS(
+        rc == SQLITE_OK || rc == SQLITE_DONE,
+        "Could not correctly execute the statement. Db error: " << sqlite3_errmsg(m_db));
+    rc = sqlite3_finalize(stmt);
+    NS_ABORT_MSG_UNLESS(
+        rc == SQLITE_OK || rc == SQLITE_DONE,
+        "Could not correctly finalize the statement. Db error: " << sqlite3_errmsg(m_db));
+}
+
 } // namespace ns3
