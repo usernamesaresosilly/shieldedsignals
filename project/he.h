@@ -1,3 +1,6 @@
+#ifndef HE_H
+#define HE_H
+
 #pragma once
 #include <seal/seal.h>
 #include <string>
@@ -5,5 +8,8 @@
 
 namespace example {
 seal::Ciphertext encrypt_string(std::string_view msg);
+
 std::string decrypt_string(const seal::Ciphertext &cipher);
 } // namespace example
+
+#endif

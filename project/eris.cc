@@ -66,12 +66,23 @@ $ ./ns3 run "nr-v2x-west-to-east-highway --help"
 #include <iostream>
 #include <cstdlib>
 #include <ctime>
+#include <chrono>
 
 #include "crypt.h"
+#include "he.h"
 
 using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE("eris");
+
+struct CryptoOverheadEntry {
+    uint32_t nodeId;
+    double encryptTime;
+    double decryptTime;
+    std::size_t length;
+    std::size_t declength;
+};
+std::vector<CryptoOverheadEntry> cryptoLog;
 
 /*
  * Global methods to hook trace sources from different layers of
@@ -162,7 +173,7 @@ UePacketTraceDb(UeToUePktTxRxOutputStats* stats,
 {
     uint32_t nodeId = node->GetId();
     uint64_t imsi = node->GetDevice(0)->GetObject<NrUeNetDevice>()->GetImsi();
-    uint32_t seq = 0;
+    uint32_t seq = p->GetUid();
     uint32_t pktSize = p->GetSize();
 
     stats->Save(txRx, localAddrs, nodeId, imsi, pktSize, srcAddrs, dstAddrs, seq);
@@ -459,7 +470,7 @@ main(int argc, char* argv[])
     uint16_t interVehicleDist = 20; // meters
     uint16_t interLaneDist = 4;     // meters
     double speed = 38.88889;        // meter per second, default 140 km/h
-    bool enableOneTxPerLane = true;
+    bool enableOneTxPerLane = false;
     bool logging = false;
     bool harqEnabled = true;
     Time delayBudget = Seconds(0); // Use T2 configuration
@@ -501,8 +512,11 @@ main(int argc, char* argv[])
     bool generateInitialPosGnuScript = false;
     bool generateGifGnuScript = false;
 
+    // flag for encryption type
+    uint16_t encryptType = 4; // 0 - No encryption, 1 - AES, 2 - RSA, 3 - ECC, 4 - Homomorphic
+
     // Where we will store the output files.
-    std::string simTag = "random string";
+    std::string simTag = "HE";
     std::string outputDir = "./";
     bool saveDb = true;
 
@@ -598,6 +612,7 @@ main(int argc, char* argv[])
     cmd.AddValue("generateGifGnuScript",
                  "generate gnuplot script to generate GIF to show UEs mobility",
                  generateGifGnuScript);
+    cmd.AddValue("encryptType", "Flag to control the encryption type used", encryptType);
 
     // Parse the command line
     cmd.Parse(argc, argv);
@@ -1097,9 +1112,76 @@ main(int argc, char* argv[])
         char c = 'a';
         std::string msg(randomNumber, c);
         
+        // record encryption overhead
+
+        std::chrono::duration<double> encryptelapsed;
+        std::chrono::duration<double> decryptelapsed;
+        std::string decmsg;
+
+        if (encryptType == 1) 
+        {
+            auto start = std::chrono::high_resolution_clock::now();
+            msg = aes_encrypt(msg);
+            auto end = std::chrono::high_resolution_clock::now();
+            encryptelapsed = end - start;
+
+            auto dstart = std::chrono::high_resolution_clock::now();
+            decmsg = aes_decrypt(msg);
+            auto dend = std::chrono::high_resolution_clock::now();
+            decryptelapsed = dend - dstart;
+        }
+        else if (encryptType == 2)
+        {
+            auto start = std::chrono::high_resolution_clock::now();
+            msg = aes_encrypt(msg);
+            auto end = std::chrono::high_resolution_clock::now();
+            encryptelapsed = end - start;
+
+            auto dstart = std::chrono::high_resolution_clock::now();
+            decmsg = aes_decrypt(msg);
+            auto dend = std::chrono::high_resolution_clock::now();
+            decryptelapsed = dend - dstart;
+        }
+        else if (encryptType == 3)
+        {
+            auto start = std::chrono::high_resolution_clock::now();
+            msg = aes_encrypt(msg);
+            auto end = std::chrono::high_resolution_clock::now();
+            encryptelapsed = end - start;
+
+            auto dstart = std::chrono::high_resolution_clock::now();
+            decmsg = aes_decrypt(msg);
+            auto dend = std::chrono::high_resolution_clock::now();
+            decryptelapsed = dend - dstart;
+        }
+        else if (encryptType == 4)
+        {
+            auto start = std::chrono::high_resolution_clock::now();
+            auto ct = example::encrypt_string(msg);
+            auto end = std::chrono::high_resolution_clock::now();
+            encryptelapsed = end - start;
+            std::stringstream ss;
+            ct.length();
+            ct.save(ss); // serialize to stream
+            msg = ss.str();
+
+            auto dstart = std::chrono::high_resolution_clock::now();
+            decmsg = example::decrypt_string(ct);
+            auto dend = std::chrono::high_resolution_clock::now();
+            decryptelapsed = dend - dstart;
+        }
+        else
+        {
+            auto start = std::chrono::high_resolution_clock::now();
+            decmsg = msg;
+            encryptelapsed = start - start;
+            decryptelapsed = start - start;
+        }
+        cryptoLog.push_back({ txSlUes.Get(i)->GetId(), encryptelapsed.count(), decryptelapsed.count(), msg.length(), decmsg.length() });
+
 
         uint32_t packetSize = 1024;
-        uint32_t maxPacketCount = 5;
+        uint32_t maxPacketCount = 40;
         Time interPacketInterval;
         bool usesetfill = true;
         if (usesetfill) {
@@ -1107,6 +1189,7 @@ main(int argc, char* argv[])
         } else {
             interPacketInterval = Seconds(((double)packetSize * 8.0 / (DataRate(dataRateBeString).GetBitRate())));
         }
+        //interPacketInterval = Seconds(0.1);
         sidelinkClient.SetAttribute("MaxPackets", UintegerValue(maxPacketCount));
         sidelinkClient.SetAttribute("Interval", TimeValue(interPacketInterval));
         sidelinkClient.SetAttribute("PacketSize", UintegerValue(packetSize));
@@ -1273,6 +1356,11 @@ main(int argc, char* argv[])
     SavePositionPerIP(&v2xKpi);
     v2xKpi.SetRangeForV2xKpis(200);
 
+    for (const auto& entry : cryptoLog)
+    {
+    v2xKpi.SaveCryptoOverhead(entry.nodeId, entry.encryptTime, entry.decryptTime, entry.length, entry.declength);
+    }
+
     if (generateInitialPosGnuScript)
     {
         std::string initPosFileName = "init-pos-ues-" + exampleName + ".txt";
@@ -1319,3 +1407,12 @@ main(int argc, char* argv[])
     }
     return 0;
 }
+
+
+
+
+    const std::string_view cam_message =
+        "CAM,StationID=101,Time=1713640000,Lat=52.5200,"
+        "Lon=13.4050,Alt=34.2,Speed=13.4,Heading=92.3,Acc=0.5";
+
+

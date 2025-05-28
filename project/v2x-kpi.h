@@ -85,6 +85,8 @@ class V2xKpi
      */
     void SetRangeForV2xKpis(uint16_t range);
 
+    void SaveCryptoOverhead(uint32_t nodeId, double encryptTime, double decryptTime, std::size_t length, std::size_t declength);  
+
   private:
     /**
      * \ingroup nr
@@ -325,6 +327,8 @@ class V2xKpi
     double ComputeAvrgPrr(std::map<uint32_t, std::vector<PktTxRxData>>::const_iterator& txIt,
                           uint32_t& numNeib);
 
+       
+
     /*
      * Key 1 = Rx node id
      * Key 2 = IP address of the transmitter this RX node received pkts from
@@ -345,7 +349,12 @@ class V2xKpi
     std::map<std::string, Vector> m_posPerIp; //!< Map to store position and IPs of the nodes
     std::uint16_t m_range{0};                 //!< Range in meter to be used to compute PIR and PRR
     double m_interTxRxDistance{0.0};          //!< The inter-TX-RX distance logged for PIR
+
+    
 };
+
+
+
 
 } // namespace ns3
 
