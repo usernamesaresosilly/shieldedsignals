@@ -4,6 +4,7 @@
 #include <cryptopp/pssr.h>
 #include <cryptopp/filters.h>
 #include <mutex>
+#include <optional>
 
 using namespace CryptoPP;
 
@@ -23,7 +24,7 @@ void init_rsa_keys() {
     std::call_once(keys_once_flag, do_init_rsa_keys);
 }
 
-std::optional<std::string> encrypt_string(const std::string& message) {
+std::optional<std::string> rsa_encrypt(const std::string& message) {
     if (message.empty()) return std::nullopt;
     init_rsa_keys();
     AutoSeededRandomPool rng;
@@ -43,7 +44,7 @@ std::optional<std::string> encrypt_string(const std::string& message) {
     return ciphertext;
 }
 
-std::optional<std::string> decrypt_string(const std::string& ciphertext) {
+std::optional<std::string> rsa_decrypt(const std::string& ciphertext) {
     if (ciphertext.empty()) return std::nullopt;
     init_rsa_keys();
     AutoSeededRandomPool rng;
