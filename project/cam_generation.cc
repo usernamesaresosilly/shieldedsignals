@@ -1,3 +1,5 @@
+#include "message_generator.h"
+
 #include <random>
 #include <cstdio>
 #include <cstdlib>
@@ -6,9 +8,8 @@
 #include <cstring>
 #include <sstream>
 #include <string>
-#include <iomanip> 
+#include <iomanip>
 
-// Message Limits
 constexpr int MAX_IDS = 1000, MIN_MSG = 1, MAX_MSG = 1;
 
 constexpr struct {
@@ -17,7 +18,6 @@ constexpr struct {
     double alt = 174.0;
 } JACKSON_GRAVE;
 
-// Base Motion Values
 constexpr double SPD = 13.4, HDG = 92.3, ACC = 0.5;
 constexpr int TIME = 171364;
 
@@ -57,26 +57,4 @@ std::string generate_messages(int n) {
     }
 
     return out.str();
-}
-
-int main(const int argc, char* argv[]) {
-    int count = MAX_MSG;
-
-    if (argc > 1) {
-        if (std::strcmp(argv[1], "--help") == 0) {
-            std::printf("Usage: %s [number_of_messages]\n", argv[0]);
-            return 0;
-        }
-
-        char* end = nullptr;
-        count = std::strtol(argv[1], &end, 10);
-        if (!end || *end != '\0' || count <= 0) {
-            std::fprintf(stderr, "Error: Argument must be a positive integer.\n");
-            return 1;
-        }
-    }
-
-    std::string output = generate_messages(count);
-    std::fputs(output.c_str(), stdout);
-    return 0;
 }
