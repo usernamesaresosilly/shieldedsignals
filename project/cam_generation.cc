@@ -1,4 +1,4 @@
-#include "message_generator.h"
+#include "cam_generation"
 
 #include <random>
 #include <cstdio>
