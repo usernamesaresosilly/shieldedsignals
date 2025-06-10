@@ -19,7 +19,7 @@ void init_rsa_keys() {
     if (!inited) {
         CryptoPP::AutoSeededRandomPool rng;
         private_key.GenerateRandomWithKeySize(rng, 2048);
-        private_key.MakePublicKey(public_key);
+        public_key.Initialize(private_key.GetModulus(), private_key.GetPublicExponent());
         inited = true;
     }
 }
