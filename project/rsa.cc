@@ -1,63 +1,57 @@
-#include "rsa.h"
+#include <vector>
+#include <string>
+#include <algorithm>
+#include <optional>
+
 #include <cryptopp/rsa.h>
 #include <cryptopp/osrng.h>
 #include <cryptopp/pssr.h>
 #include <cryptopp/filters.h>
-#include <mutex>
-#include <optional>
 
 using namespace CryptoPP;
 
-namespace {
-    static RSA::PrivateKey private_key;
-    static RSA::PublicKey public_key;
-    static std::once_flag keys_once_flag;
+// forward-declare your init function (must be defined elsewhere)
+void init_rsa_keys();
 
-    void do_init_rsa_keys() {
-        AutoSeededRandomPool local_rng;
-        private_key.GenerateRandomWithKeySize(local_rng, 2048);
-        public_key.AssignFrom(private_key);
-    }
-}
+extern RSA::PublicKey public_key;
+extern RSA::PrivateKey private_key;
 
-void init_rsa_keys() {
-    std::call_once(keys_once_flag, do_init_rsa_keys);
-}
-
-std::optional<std::string> rsa_encrypt(const std::string& message) {
-    if (message.empty()) return std::nullopt;
+std::vector<std::string> rsa_encrypt_chunks(const std::string& message) {
     init_rsa_keys();
     AutoSeededRandomPool rng;
     RSAES_OAEP_SHA_Encryptor encryptor(public_key);
+
     size_t maxLen = encryptor.FixedMaxPlaintextLength();
-    if (message.size() > maxLen) return std::nullopt;
-    std::string ciphertext;
-    try {
-        StringSource(message, true,
+    std::vector<std::string> ciphertexts;
+    ciphertexts.reserve((message.size() + maxLen - 1) / maxLen);
+
+    for (size_t offset = 0; offset < message.size(); offset += maxLen) {
+        size_t chunkSize = std::min(maxLen, message.size() - offset);
+        std::string chunkCT;
+        StringSource(
+            message.data() + offset, chunkSize, true,
             new PK_EncryptorFilter(rng, encryptor,
-                new StringSink(ciphertext)
+                new StringSink(chunkCT)
             )
         );
-    } catch (const CryptoPP::Exception&) {
-        return std::nullopt;
+        ciphertexts.push_back(std::move(chunkCT));
     }
-    return ciphertext;
+    return ciphertexts;
 }
 
-std::optional<std::string> rsa_decrypt(const std::string& ciphertext) {
-    if (ciphertext.empty()) return std::nullopt;
+std::optional<std::string> rsa_decrypt_chunks(const std::vector<std::string>& ciphertexts) {
     init_rsa_keys();
     AutoSeededRandomPool rng;
     RSAES_OAEP_SHA_Decryptor decryptor(private_key);
+
     std::string recovered;
-    try {
-        StringSource(ciphertext, true,
+    for (const auto& chunkCT : ciphertexts) {
+        StringSource(
+            chunkCT, true,
             new PK_DecryptorFilter(rng, decryptor,
                 new StringSink(recovered)
-            )
+            )  // if decryption fails, this will throw
         );
-    } catch (const CryptoPP::Exception&) {
-        return std::nullopt;
     }
     return recovered;
 }
