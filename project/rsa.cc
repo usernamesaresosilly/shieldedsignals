@@ -29,12 +29,14 @@ std::vector<std::string> rsa_encrypt_chunks(const std::string& message) {
         size_t chunkSize = std::min(maxLen, message.size() - offset);
         std::string chunkCT;
 
-        // cast to the correct byte-pointer type so the right overload is used:
+        // cast char* -> byte* so it matches the StringSource overload
         StringSource(
             reinterpret_cast<const byte*>(message.data() + offset),
             chunkSize,
-            true,
-            new PK_EncryptorFilter(rng, encryptor,
+            true,  // pumpAll
+            new PK_EncryptorFilter(
+                rng,
+                encryptor,
                 new StringSink(chunkCT)
             )
         );
@@ -45,31 +47,25 @@ std::vector<std::string> rsa_encrypt_chunks(const std::string& message) {
     return ciphertexts;
 }
 
-std::vector<std::string> rsa_encrypt_chunks(const std::string& message) {
+std::optional<std::string> rsa_decrypt_chunks(const std::vector<std::string>& ciphertexts) {
     init_rsa_keys();
     AutoSeededRandomPool rng;
-    RSAES_OAEP_SHA_Encryptor encryptor(public_key);
+    RSAES_OAEP_SHA_Decryptor decryptor(private_key);
 
-    size_t maxLen = encryptor.FixedMaxPlaintextLength();
-    std::vector<std::string> ciphertexts;
-    ciphertexts.reserve((message.size() + maxLen - 1) / maxLen);
-
-    for (size_t offset = 0; offset < message.size(); offset += maxLen) {
-        size_t chunkSize = std::min(maxLen, message.size() - offset);
-        std::string chunkCT;
-
+    std::string recovered;
+    for (const auto& chunkCT : ciphertexts) {
+        // similarly cast here
         StringSource(
-            reinterpret_cast<const byte*>(message.data() + offset), // explicit cast to const byte*
-            chunkSize,
+            reinterpret_cast<const byte*>(chunkCT.data()),
+            chunkCT.size(),
             true,
-            new PK_EncryptorFilter(rng, encryptor,
-                new StringSink(chunkCT)
+            new PK_DecryptorFilter(
+                rng,
+                decryptor,
+                new StringSink(recovered)
             )
         );
-
-        ciphertexts.push_back(std::move(chunkCT));
     }
 
-    return ciphertexts;
+    return recovered;
 }
-
