@@ -10,11 +10,19 @@
 
 using namespace CryptoPP;
 
-// forward-declare your init function (must be defined elsewhere)
-void init_rsa_keys();
+/// define the globals exactly once
+CryptoPP::RSA::PrivateKey private_key;
+CryptoPP::RSA::PublicKey  public_key;
 
-extern RSA::PublicKey public_key;
-extern RSA::PrivateKey private_key;
+void init_rsa_keys() {
+    static bool inited = false;
+    if (!inited) {
+        CryptoPP::AutoSeededRandomPool rng;
+        private_key.GenerateRandomWithKeySize(rng, 2048);
+        private_key.MakePublicKey(public_key);
+        inited = true;
+    }
+}
 
 std::vector<std::string> rsa_encrypt_chunks(const std::string& message) {
     init_rsa_keys();
