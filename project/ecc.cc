@@ -12,10 +12,12 @@
 
 using namespace CryptoPP;
 
+using EcdhCtx = ECDH<ECP>::Domain;
+
 namespace {
-    const ECDH<ECP>::Domain& get_ec_domain() {
-        static ECDH<ECP>::Domain domain(ASN1::secp256r1());
-        return domain;
+    const EcdhCtx& get_ec_do() {
+        static EcdhCtx ecdh_curve(ASN1::secp256r1());
+        return ecdh_curve;
     }
 
     static std::once_flag keys_once_flag;
@@ -23,11 +25,11 @@ namespace {
 
     void do_init_keys() {
         AutoSeededRandomPool rng;
-        const ECDH<ECP>::Domain& domain = get_ec_domain();
+        const auto& dom = get_ec_do();
 
-        privateKey.CleanNew(domain.PrivateKeyLength());
-        publicKey.CleanNew(domain.PublicKeyLength());
-        domain.GenerateKeyPair(rng, privateKey, publicKey);
+        privateKey.CleanNew(dom.PrivateKeyLength());
+        publicKey.CleanNew(dom.PublicKeyLength());
+        dom.GenerateKeyPair(rng, privateKey, publicKey);
     }
 
     void ensure_keys_initialized() {
@@ -35,24 +37,18 @@ namespace {
     }
 }
 
-// Encrypts the input message. Returns an empty string on failure.
 std::string ecc_encrypt(const std::string& message) {
-    if (message.empty()) {
-        return "";
-    }
+    if (message.empty()) return "";
     ensure_keys_initialized();
 
     AutoSeededRandomPool rng;
-    const ECDH<ECP>::Domain& domain = get_ec_domain();
+    const auto& dom = get_ec_do();
 
-    SecByteBlock ephPriv(domain.PrivateKeyLength());
-    SecByteBlock ephPub(domain.PublicKeyLength());
-    domain.GenerateKeyPair(rng, ephPriv, ephPub);
+    SecByteBlock ephPriv(dom.PrivateKeyLength()), ephPub(dom.PublicKeyLength());
+    dom.GenerateKeyPair(rng, ephPriv, ephPub);
 
-    SecByteBlock shared(domain.AgreedValueLength());
-    if (!domain.Agree(shared, ephPriv, publicKey)) {
-        return "";
-    }
+    SecByteBlock shared(dom.AgreedValueLength());
+    if (!dom.Agree(shared, ephPriv, publicKey)) return "";
 
     SecByteBlock aesKey(AES::DEFAULT_KEYLENGTH);
     std::memcpy(aesKey.data(), shared.data(), aesKey.size());
@@ -64,9 +60,7 @@ std::string ecc_encrypt(const std::string& message) {
     try {
         CBC_Mode<AES>::Encryption aesEnc;
         aesEnc.SetKeyWithIV(aesKey, aesKey.size(), iv);
-        StringSource(
-            message,
-            true,
+        StringSource(message, true,
             new StreamTransformationFilter(aesEnc, new StringSink(ciphertext))
         );
     } catch (...) {
@@ -80,25 +74,20 @@ std::string ecc_encrypt(const std::string& message) {
     return output;
 }
 
-// Decrypts the input blob. Returns an empty string on failure.
 std::string ecc_decrypt(const std::string& blob) {
     ensure_keys_initialized();
-    const ECDH<ECP>::Domain& domain = get_ec_domain();
+    const auto& dom = get_ec_do();
 
-    const size_t ephLen = domain.PublicKeyLength();
+    const size_t ephLen = dom.PublicKeyLength();
     const size_t ivLen = AES::BLOCKSIZE;
-    if (blob.size() < ephLen + ivLen) {
-        return "";
-    }
+    if (blob.size() < ephLen + ivLen) return "";
 
     SecByteBlock ephPub(reinterpret_cast<const byte*>(blob.data()), ephLen);
     const byte* iv = reinterpret_cast<const byte*>(blob.data() + ephLen);
     std::string cipherText = blob.substr(ephLen + ivLen);
 
-    SecByteBlock shared(domain.AgreedValueLength());
-    if (!domain.Agree(shared, privateKey, ephPub)) {
-        return "";
-    }
+    SecByteBlock shared(dom.AgreedValueLength());
+    if (!dom.Agree(shared, privateKey, ephPub)) return "";
 
     SecByteBlock aesKey(AES::DEFAULT_KEYLENGTH);
     std::memcpy(aesKey.data(), shared.data(), aesKey.size());
@@ -107,9 +96,7 @@ std::string ecc_decrypt(const std::string& blob) {
     try {
         CBC_Mode<AES>::Decryption aesDec;
         aesDec.SetKeyWithIV(aesKey, aesKey.size(), iv);
-        StringSource(
-            cipherText,
-            true,
+        StringSource(cipherText, true,
             new StreamTransformationFilter(aesDec, new StringSink(recovered))
         );
     } catch (...) {
