@@ -53,7 +53,7 @@ sudo apt install -y \
 Clone and set up NS3:
 
 ```bash
-git clone https://gitlab.com/cttc-lena/ns-3-dev.git -b v2x-lte-dev
+git clone https://gitlab.com/cttc-lena/ns-3-dev/-/tree/v2x-lte-dev?ref_type=heads
 cd ns-3-dev
 ```
 
@@ -65,7 +65,7 @@ Clone the NR module within NS3’s `contrib` directory:
 
 ```bash
 cd contrib
-git clone https://gitlab.com/cttc-lena/nr.git -b nr-v2x-dev nr
+git clone https://gitlab.com/cttc-lena/nr/-/blob/nr-v2x-dev/README.md?ref_type=heads
 ```
 
 ---
