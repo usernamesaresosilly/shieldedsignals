@@ -68,8 +68,11 @@ $ ./ns3 run "nr-v2x-west-to-east-highway --help"
 #include <ctime>
 #include <chrono>
 
-#include "crypt.h"
+#include "aes.h"
 #include "he.h"
+#include "rsa.h"
+#include "ecc.h"
+#include "cam_generation.h"
 
 using namespace ns3;
 
@@ -513,10 +516,10 @@ main(int argc, char* argv[])
     bool generateGifGnuScript = false;
 
     // flag for encryption type
-    uint16_t encryptType = 4; // 0 - No encryption, 1 - AES, 2 - RSA, 3 - ECC, 4 - Homomorphic
+    uint16_t encryptType = 0; // 0 - No encryption, 1 - AES, 2 - RSA, 3 - ECC, 4 - Homomorphic
 
     // Where we will store the output files.
-    std::string simTag = "HE";
+    std::string simTag = "Default";
     std::string outputDir = "./";
     bool saveDb = true;
 
@@ -1092,33 +1095,60 @@ main(int argc, char* argv[])
     startTimeSeconds->SetAttribute("Min", DoubleValue(0));
     startTimeSeconds->SetAttribute("Max", DoubleValue(0.10));
 
+    // if using Sequence headers ( not availbe for UDPEchoClient)
     //sidelinkClient.SetAttribute("EnableSeqTsSizeHeader", BooleanValue(true));
+    
     std::string dataRateBeString = std::to_string(dataRateBe) + "kb/s";
     std::cout << "Data rate " << DataRate(dataRateBeString) << std::endl;
-    //sidelinkClient.SetConstantRate(DataRate(dataRateBeString), udpPacketSizeBe);
-
+    
+    
+    bool usesetfill = true;
     // Set Application in the UEs
+    //warmup encryption
+    if (encryptType == 1) 
+    {
+        aes_encrypt("WARMUP");
+    }
+    else if (encryptType == 2)
+    {
+        rsa_encrypt_chunks("WARMUP");
+    }
+    else if (encryptType == 3)
+    {
+        ecc_encrypt("WARMUP");
+    }
+    else if (encryptType == 4)
+    {
+        example::encrypt_string("WARMUP");
+        usesetfill = false;
+    }
     
     ApplicationContainer clientApps;
     double realAppStart = 0.0;
     double realAppStopTime = 0.0;
     double txAppDuration = 0.0;
     std::srand(std::time(0)); 
+    bool usesamplepacket = true ;
     for (uint32_t i = 0; i < txSlUes.GetN(); i++) {
     
         UdpEchoClientHelper sidelinkClient(remoteAddress, port);
+        std::string msg = "";
+        if (usesamplepacket) {
+            int randomNumber = (std::rand() % 10) + 1;
+            msg = generate_messages(randomNumber);
+        } else {
+            int randomNumber = (std::rand() % 1400) + 1;
+            char c = 'a';
+            std::string msg(randomNumber, c);
+        }
         
-        int randomNumber = (std::rand() % 100) + 1;
-        char c = 'a';
-        std::string msg(randomNumber, c);
         
         // record encryption overhead
-
         std::chrono::duration<double> encryptelapsed;
         std::chrono::duration<double> decryptelapsed;
         std::string decmsg;
 
-        if (encryptType == 1) 
+        if (encryptType == 1) //AES
         {
             auto start = std::chrono::high_resolution_clock::now();
             msg = aes_encrypt(msg);
@@ -1130,38 +1160,44 @@ main(int argc, char* argv[])
             auto dend = std::chrono::high_resolution_clock::now();
             decryptelapsed = dend - dstart;
         }
-        else if (encryptType == 2)
+        else if (encryptType == 2) //RSA
+        {
+            std::cout << msg;
+            auto start = std::chrono::high_resolution_clock::now();
+            auto rct = rsa_encrypt_chunks(msg);
+            auto end = std::chrono::high_resolution_clock::now();
+            encryptelapsed = end - start;
+            for (const auto& s : rct) {
+                msg += s;
+            }
+            std::cout << msg;
+
+            auto dstart = std::chrono::high_resolution_clock::now();
+            auto rdecmsg = rsa_decrypt_chunks(rct);
+            auto dend = std::chrono::high_resolution_clock::now();
+            decryptelapsed = dend - dstart;
+            decmsg = rdecmsg.value_or("");
+            std::cout << decmsg;
+        }
+        else if (encryptType == 3) //ECC
         {
             auto start = std::chrono::high_resolution_clock::now();
-            msg = aes_encrypt(msg);
+            msg = ecc_encrypt(msg);
             auto end = std::chrono::high_resolution_clock::now();
             encryptelapsed = end - start;
 
             auto dstart = std::chrono::high_resolution_clock::now();
-            decmsg = aes_decrypt(msg);
+            decmsg = ecc_decrypt(msg);
             auto dend = std::chrono::high_resolution_clock::now();
             decryptelapsed = dend - dstart;
         }
-        else if (encryptType == 3)
-        {
-            auto start = std::chrono::high_resolution_clock::now();
-            msg = aes_encrypt(msg);
-            auto end = std::chrono::high_resolution_clock::now();
-            encryptelapsed = end - start;
-
-            auto dstart = std::chrono::high_resolution_clock::now();
-            decmsg = aes_decrypt(msg);
-            auto dend = std::chrono::high_resolution_clock::now();
-            decryptelapsed = dend - dstart;
-        }
-        else if (encryptType == 4)
+        else if (encryptType == 4) //Homomorphic
         {
             auto start = std::chrono::high_resolution_clock::now();
             auto ct = example::encrypt_string(msg);
             auto end = std::chrono::high_resolution_clock::now();
             encryptelapsed = end - start;
             std::stringstream ss;
-            ct.length();
             ct.save(ss); // serialize to stream
             msg = ss.str();
 
@@ -1170,7 +1206,7 @@ main(int argc, char* argv[])
             auto dend = std::chrono::high_resolution_clock::now();
             decryptelapsed = dend - dstart;
         }
-        else
+        else // No encryption
         {
             auto start = std::chrono::high_resolution_clock::now();
             decmsg = msg;
@@ -1182,14 +1218,21 @@ main(int argc, char* argv[])
 
         uint32_t packetSize = 1024;
         uint32_t maxPacketCount = 40;
+        if (encryptType == 4) { //Homomorphic needs to be split up to work
+            // Max Transmission unit to base packet size off of. Can still work at larger sizes
+            // 1500 is common for most comunications 1420 often used for 5G
+            uint32_t mtu = 1420; 
+            maxPacketCount = std::ceil(static_cast<double>(msg.length()) / mtu);
+            packetSize = std::ceil(static_cast<double>(msg.length()) / maxPacketCount);
+        }
         Time interPacketInterval;
-        bool usesetfill = true;
+        
         if (usesetfill) {
             interPacketInterval = Seconds(((double)msg.length() * 8.0 / (DataRate(dataRateBeString).GetBitRate())));
         } else {
             interPacketInterval = Seconds(((double)packetSize * 8.0 / (DataRate(dataRateBeString).GetBitRate())));
         }
-        //interPacketInterval = Seconds(0.1);
+        interPacketInterval = Seconds(.005);
         sidelinkClient.SetAttribute("MaxPackets", UintegerValue(maxPacketCount));
         sidelinkClient.SetAttribute("Interval", TimeValue(interPacketInterval));
         sidelinkClient.SetAttribute("PacketSize", UintegerValue(packetSize));
@@ -1197,12 +1240,11 @@ main(int argc, char* argv[])
     
         clientApps.Add(sidelinkClient.Install(txSlUes.Get(i)));
         double jitter = startTimeSeconds->GetValue();
+
+
         Time appStart = slBearersActivationTime + Seconds(jitter) + 
                 Seconds(((double)udpPacketSizeBe * 8.0) / (DataRate(dataRateBeString).GetBitRate()));
         clientApps.Get(i)->SetStartTime(appStart);
-        // onoff application will send the first packet at :
-        // slBearersActivationTime + random jitter + ((Pkt size in bits) / (Data rate in bits per
-        // sec))
 
         if (usesetfill) {
             sidelinkClient.SetFill (clientApps.Get (i), msg);
