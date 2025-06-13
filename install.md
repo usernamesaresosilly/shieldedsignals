@@ -6,7 +6,7 @@ This document provides step-by-step instructions for setting up **ShieldedSignal
 
 ## System Requirements
 
-- **OS:** Ubuntu 20.04+ or Debian-based distributions
+- **OS:** Ubuntu 22.04+ or Debian-based distributions
 - **Privileges:** Sudo privileges
 - **Resources:** At least 4 CPU cores and 8 GB RAM recommended
 
