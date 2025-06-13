@@ -2,7 +2,7 @@
 
 ## Setting up NS3
 
-### 1. Install NS3 (ns-3-dev, `v2x-lte-dev` branch)
+### 1. Install NS3 (`ns-3-dev`, `v2x-lte-dev` branch)
 
 Clone the NS3 repository using the following link:  
 [https://gitlab.com/cttc-lena/ns-3-dev/-/tree/v2x-lte-dev?ref_type=heads](https://gitlab.com/cttc-lena/ns-3-dev/-/tree/v2x-lte-dev?ref_type=heads)
@@ -14,22 +14,23 @@ Be sure to name the folder `nr`:
 
 [https://gitlab.com/cttc-lena/nr/-/blob/nr-v2x-dev/README.md?ref_type=heads](https://gitlab.com/cttc-lena/nr/-/blob/nr-v2x-dev/README.md?ref_type=heads)
 
-Follow the instructions in the nr module README fro how to set up the NS3 distribution and the nr module
+Follow the instructions in the NR module README to properly configure the NS3 distribution and integrate the NR module.
 
 ### 3. Install dependencies
 
-There is a setup script available to install dependencies for SEAL and Crypto++.  
-Please use the provided script to ensure proper configuration.
+There is a setup script provided to install all required dependencies for SEAL and Crypto++.  
+Please run the script to ensure proper configuration of the libraries.
 
-### 4. Setup project in scratch
+### 4. Setup project in `scratch`
 
-Move the files in this respositroy's project folder over to a folder in the scracth directory of NS3.
+Move the files from this repository's `project` folder into a new folder under the `scratch` directory of NS3.
 
-Add the following three line of code to the CmakeList file in scratch
+Next, add the following lines to the `CMakeLists.txt` file inside the `scratch` directory:
 
+```cmake
 include_directories(/usr/include ~/)
 link_directories(/usr/local/lib)
 link_libraries(cryptopp seal-4.1)
+```
 
-Use the script form #3 then the dependencies will work, if installed ina different location then add the directory where it is stored to the include directories line
-
+> **Note:** If the dependencies were installed in a different location, update the `include_directories` and `link_directories` paths accordingly to point to the correct installation directories. Also install.md goes a bit farther in depth on setup.
