@@ -33,4 +33,4 @@ link_directories(/usr/local/lib)
 link_libraries(cryptopp seal-4.1)
 ```
 
-> **Note:** If the dependencies were installed in a different location, update the `include_directories` and `link_directories` paths accordingly to point to the correct installation directories. Also install.md goes a bit farther in depth on setup.
+> **Note:** If the dependencies were installed in a different location, update the `include_directories` and `link_directories` paths accordingly to point to the correct installation directories. Also install.md goes a bit farther in depth on setup
