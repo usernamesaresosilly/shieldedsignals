@@ -1,4 +1,4 @@
-# shieldedsignals
+# Shieldedsignals
 
 ## Setting up NS3
 1. Install NS3 ns-3-dev, v2x-lte-dev brannch
