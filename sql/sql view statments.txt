@@ -1,0 +1,87 @@
+CREATE VIEW tx AS 
+  SELECT 
+    `timeSec` AS `tx_time`,
+    `nodeId`,
+    `pktSizeBytes`,
+    `srcIp`,
+    `pktSeqNum`
+  FROM `pktTxRx`
+  WHERE `txRX` = 'tx'
+;
+
+CREATE VIEW rx AS 
+  SELECT 
+    `timeSec` AS `rx_time`,
+    `nodeId`,
+    `pktSizeBytes`,
+    `srcIp`,
+    `dstIp`,
+    `pktSeqNum`
+  FROM `pktTxRx`
+  WHERE `txRx` = 'rx'
+;
+
+CREATE VIEW rxtotx AS
+SELECT 
+  tx.pktSeqNum,
+  tx.srcIp,
+  rx.dstIp,
+  rx.pktSizeBytes,
+  rx.rx_time - tx.tx_time AS latency,
+  rx.rx_time - tx.tx_time + (CAST(rx.pktSizeBytes as double) * 8)/16000 AS latencywithinterval,
+  co.encryptionTime,
+  co.decryptionTime,
+  co.declength,
+  co.encryptionTime + co.decryptionTime AS overhead,
+  (rx.rx_time - tx.tx_time) + co.encryptionTime + co.decryptionTime AS totaltime,
+  avrgPir.TxRxDistance
+FROM rx
+JOIN tx 
+  ON rx.srcIp = tx.srcIp
+  AND rx.pktSeqNum = tx.pktSeqNum
+JOIN avrgPir
+  ON rx.srcIp = avrgPir.srcIp
+  AND rx.dstIp = avrgPir.dstIp
+JOIN cryptoOverhead AS co
+  ON tx.nodeId = co.nodeId;
+
+  
+CREATE VIEW first_tx_last_rx AS
+SELECT
+  first_tx.srcIp,
+  last_rx.dstIp,
+  first_tx.first_tx_time,
+  last_rx.last_rx_time,
+  last_rx.pktSizeBytes,
+  (last_rx.last_rx_time - first_tx.first_tx_time) AS latency,
+  co.encryptionTime,
+  co.decryptionTime,
+  co.declength,
+  co.encryptionTime + co.decryptionTime AS overhead,
+  avrgPir.TxRxDistance
+FROM
+  (SELECT srcIp, dstIp, MAX(rx_time) AS last_rx_time, pktSizeBytes
+     FROM rx
+     GROUP BY srcIp, dstIp
+  ) AS last_rx
+JOIN
+  (SELECT srcIp, nodeId, MIN(tx_time) AS first_tx_time
+     FROM tx
+     GROUP BY srcIp
+  ) AS first_tx
+  ON last_rx.srcIp = first_tx.srcIp
+JOIN cryptoOverhead co
+  ON co.nodeId = first_tx.nodeId  -- or whatever the correct node mapping is
+JOIN avrgPir
+  ON last_rx.srcIp = avrgPir.srcIp AND last_rx.dstIp = avrgPir.dstIp
+;
+
+CREATE VIEW cryptTime AS
+SELECT
+  co.nodeId,
+  co.encryptionTime,
+  co.decryptionTime,
+  co.declength,
+  co.encryptionTime + co.decryptionTime AS overhead
+FROM cryptoOverhead co;
+  
